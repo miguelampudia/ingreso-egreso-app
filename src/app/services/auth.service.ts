@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { AppState } from '../app.reducer';
 import * as AuthAction from '../auth/auth.action';
+import { unSetItemns } from '../ingreso-egreso/ingreso-egreso.action';
 import { Usuario } from '../models/usuario.model';
 
 @Injectable({
@@ -14,6 +15,11 @@ import { Usuario } from '../models/usuario.model';
 export class AuthService {
 
   userSubcripcion: Subscription;
+  private _user: Usuario;
+
+  get user() {
+    return this._user;
+  }
 
   constructor(public auth: AngularFireAuth, private firestrore: AngularFirestore, private store: Store<AppState>) { }
 
@@ -23,22 +29,31 @@ export class AuthService {
         this.userSubcripcion = this.firestrore.doc(`${fuser.uid}/usuario`).valueChanges().subscribe((firestroreuser: any) => {
 
           const user = Usuario.fromFireBase(firestroreuser);
-          this.store.dispatch(AuthAction.setUser({ user }))
+          this._user = user;
+          this.store.dispatch(AuthAction.setUser({ user }));
         });
       else {
+        this._user = null;
         this.userSubcripcion.unsubscribe();
         this.store.dispatch(AuthAction.unUser());
+        this.store.dispatch(unSetItemns());
       }
     });
   }
 
 
-  crearUsuario(nombre: string, email: string, password: string) {
-    return this.auth.createUserWithEmailAndPassword(email, password).then(({ user }) => {
-      const newUser = new Usuario(user.uid, nombre, user.email);
+  // crearUsuario(nombre: string, email: string, password: string) {
+  //   return this.auth.createUserWithEmailAndPassword(email, password).then(({ user }) => {
+  //     const newUser = new Usuario(user.uid, nombre, user.email);
 
-      return this.firestrore.doc(`${user.uid}/usuario`).set({ ...newUser });
-    });
+  //     return this.firestrore.doc(`${user.uid}/usuario`).set({ ...newUser });
+  //   });
+  // }
+
+  async crearUsuario(nombre: string, email: string, password: string) {
+    const { user } = await this.auth.createUserWithEmailAndPassword(email, password);
+    const newUser = new Usuario(user.uid, nombre, user.email);
+    return this.firestrore.doc(`${user.uid}/usuario`).set({ ...newUser });
   }
 
   loginUsuario(email: string, password: string) {
